@@ -26,3 +26,6 @@ jobs:
       - name: Execute Tests
         run: |
           pytest
+      - name: Execute Linting
+        run: |
+          pre-commit

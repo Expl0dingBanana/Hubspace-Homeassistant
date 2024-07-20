@@ -1,13 +1,14 @@
-import requests
-import json
-import re
+import asyncio
+import base64
 import calendar
 import datetime
 import hashlib
-import base64
-import os
-import asyncio
+import json
 import logging
+import os
+import re
+
+import requests
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -205,16 +206,29 @@ class HubSpace:
         return r
 
     def getModelFromMetadata(self, model, deviceClass, defaultName, defaultImage):
-        if model is not None and deviceClass is not None and defaultName is not None and defaultImage is not None:
+        if (
+            model is not None
+            and deviceClass is not None
+            and defaultName is not None
+            and defaultImage is not None
+        ):
             if model == "" and defaultImage == "ceiling-fan-snyder-park-icon":
                 model = "DriskolFan"
             if model == "" and defaultImage == "ceiling-fan-vinings-icon":
                 model = "VinwoodFan"
-            if deviceClass == "fan" and model == "TBD" and defaultImage == "ceiling-fan-chandra-icon":
+            if (
+                deviceClass == "fan"
+                and model == "TBD"
+                and defaultImage == "ceiling-fan-chandra-icon"
+            ):
                 model = "ZandraFan"
             if model == "TBD" and defaultImage == "ceiling-fan-ac-cct-dardanus-icon":
-                model = "NevaliFan"    
-            if deviceClass == "fan" and model == "" and defaultImage == "ceiling-fan-slender-icon":
+                model = "NevaliFan"
+            if (
+                deviceClass == "fan"
+                and model == ""
+                and defaultImage == "ceiling-fan-slender-icon"
+            ):
                 model = "TagerFan"
             if defaultName == "Smart Stake Timer":
                 model = "YardStake"
@@ -273,19 +287,36 @@ class HubSpace:
                     defaultName = (
                         lis.get("description").get("device").get("defaultName")
                     )
-                    defaultImage = (
-                        lis.get("description").get("defaultImage")
-                    )
-                    if model is not None and deviceClass is not None and defaultName is not None and defaultImage is not None:
-                        if model == "" and defaultImage == "ceiling-fan-snyder-park-icon":
+                    defaultImage = lis.get("description").get("defaultImage")
+                    if (
+                        model is not None
+                        and deviceClass is not None
+                        and defaultName is not None
+                        and defaultImage is not None
+                    ):
+                        if (
+                            model == ""
+                            and defaultImage == "ceiling-fan-snyder-park-icon"
+                        ):
                             model = "DriskolFan"
                         if model == "" and defaultImage == "ceiling-fan-vinings-icon":
                             model = "VinwoodFan"
-                        if deviceClass == "fan" and model == "TBD" and defaultImage == "ceiling-fan-chandra-icon":
+                        if (
+                            deviceClass == "fan"
+                            and model == "TBD"
+                            and defaultImage == "ceiling-fan-chandra-icon"
+                        ):
                             model = "ZandraFan"
-                        if model == "TBD" and defaultImage == "ceiling-fan-ac-cct-dardanus-icon":
+                        if (
+                            model == "TBD"
+                            and defaultImage == "ceiling-fan-ac-cct-dardanus-icon"
+                        ):
                             model = "NevaliFan"
-                        if deviceClass == "fan" and model == "" and defaultImage == "ceiling-fan-slender-icon":
+                        if (
+                            deviceClass == "fan"
+                            and model == ""
+                            and defaultImage == "ceiling-fan-slender-icon"
+                        ):
                             model = "TagerFan"
                         if defaultName == "Smart Stake Timer":
                             model = "YardStake"
@@ -329,23 +360,33 @@ class HubSpace:
                     defaultName = (
                         lis.get("description").get("device").get("defaultName")
                     )
-                    defaultImage = (
-                        lis.get("description").get("defaultImage")
-                    )
-                    if model is not None and deviceClass is not None and defaultName is not None and defaultImage is not None:
-                        if model == "" and defaultImage == "ceiling-fan-snyder-park-icon":
+                    defaultImage = lis.get("description").get("defaultImage")
+                    if (
+                        model is not None
+                        and deviceClass is not None
+                        and defaultName is not None
+                        and defaultImage is not None
+                    ):
+                        if (
+                            model == ""
+                            and defaultImage == "ceiling-fan-snyder-park-icon"
+                        ):
                             model = "DriskolFan"
                         if model == "" and defaultImage == "ceiling-fan-vinings-icon":
                             model = "VinwoodFan"
                         if deviceClass == "fan" and model == "TBD":
                             model = "ZandraFan"
-                        if deviceClass == "fan" and model == "" and defaultImage == "ceiling-fan-slender-icon":
+                        if (
+                            deviceClass == "fan"
+                            and model == ""
+                            and defaultImage == "ceiling-fan-slender-icon"
+                        ):
                             model = "TagerFan"
                         if defaultName == "Smart Stake Timer":
                             model = "YardStake"
                             deviceClass = "light"
                         if defaultImage == "a19-e26-color-cct-60w-smd-frosted-icon":
-                            model = "12A19060WRGBWH2"    
+                            model = "12A19060WRGBWH2"
                         return child, model, deviceId, deviceClass
 
         # _LOGGER.debug("No model found ")
@@ -385,7 +426,6 @@ class HubSpace:
         r.raise_for_status()
         return r.json()
 
-
     def getState(self, child, desiredStateName):
 
         state = None
@@ -418,9 +458,13 @@ class HubSpace:
                 for key, val in lis.items():
                     if key == "functionClass" and val == desiredStateName:
                         state = lis.get("value")
-                    if key == "functionClass" and val == "available" and not lis.get("value"):
-                        return None 
-                        #return None
+                    if (
+                        key == "functionClass"
+                        and val == "available"
+                        and not lis.get("value")
+                    ):
+                        return None
+                        # return None
 
         # print(desiredStateName + ": " + state)
         return state
@@ -452,8 +496,12 @@ class HubSpace:
         if r.ok:
             for lis in r.json().get("values"):
                 for key, val in lis.items():
-                    if key == "functionClass" and val == "available" and not lis.get("value"):
-                        return None  
+                    if (
+                        key == "functionClass"
+                        and val == "available"
+                        and not lis.get("value")
+                    ):
+                        return None
                     if (
                         key == "functionClass"
                         and val == desiredStateName
@@ -563,10 +611,7 @@ class HubSpace:
         for state in new_states:
             state["lastUpdateTime"] = utc_time
             payload_states.append(state)
-        payload = {
-            "metadeviceId": str(child),
-            "values": payload_states
-        }
+        payload = {"metadeviceId": str(child), "values": payload_states}
         auth_header = {
             "user-agent": "Dart/2.15 (dart:io)",
             "host": "semantics2.afero.net",
@@ -581,9 +626,7 @@ class HubSpace:
             + child
             + "/state"
         )
-        _LOGGER.debug(
-            f"About to update {child}: {payload_states}"
-        )
+        _LOGGER.debug(f"About to update {child}: {payload_states}")
         r = requests.put(auth_url, json=payload, headers=auth_header)
         r.close()
         r.raise_for_status()
@@ -667,7 +710,7 @@ class HubSpace:
         state = self.getState(child, "color-rgb")
         if state is None:
             return None
-            
+
         r = int(state.get("color-rgb").get("r"))
         g = int(state.get("color-rgb").get("g"))
         b = int(state.get("color-rgb").get("b"))

@@ -3,9 +3,8 @@
 Please ask support questions in homeassistant forums: https://community.home-assistant.io/t/add-support-for-hubspace-by-afero/306645
 
 ### Background
-If you can find another device that works for your needs, I would highly recommend doing so over Hubspace devices. This integration is meant to give basic functionality. Hubspace devices are not good devices for integration with Home Assistant as it stands. If a good coder takes the integration over, maybe it could work better. The main issues are updates are slow and the UI can be unresponsive to any changes.
-
-Hubspace devices are 100% reliant on the cloud for homeassistant. If Hubspace goes out of business, they will be useless. Some devices have a Bluetooth fall back (many devices use a custom unflashable ESP32-based chip), which the Hubspace app can control, but I have not been able to reverse engineer the BLE protocol. A better coder/BLE expert might figure it out. You could probably solder in your own ESP or ESP32 and use with ESPHome/Tasmota if you are skilled.
+HubSpace is reliant on a cloud connection which means this integration could break at any point. Not all
+devices may be supported with and developer time will be required to add new devices.
 
 ### Breaking Change:
 Now supports services for capability not provided by the integration. See Services section below
@@ -16,6 +15,16 @@ Since some of the internals were changed, so your light name may change. For ins
 
 To solve this, go to Settings->Devices and Services->Entities
 find the light.friendlyname and delete it. then find the light.friendlyname_2 and rename it light.friendlyname
+
+TEMPORARY:
+The following entity types have been removed:
+
+ * Outlets
+ * Transformer
+ * Water Time
+
+Configuration of fans requires a new entry in ``configuration.yaml``. It is the same as ``light``, but
+the key is ``fan``.
 
 ### Information :
 99% of the issues are that your friendlyname is incorrect, see Troubleshooting section below. Please use the issue section only for support of new devices.
@@ -65,16 +74,16 @@ Clicking this badge should add the repo for you:
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jdeath&repository=Hubspace-Homeassistant&category=integration)
 
 Manually add repo:
-Adding a custom repo directions `https://hacs.xyz/docs/faq/custom_repositories/`  
-Use the custom repo link `https://github.com/jdeath/Hubspace-Homeassistant` 
-Select the category type `integration`  
-Then once it's there (still in HACS) click the INSTALL button  
+Adding a custom repo directions `https://hacs.xyz/docs/faq/custom_repositories/`
+Use the custom repo link `https://github.com/jdeath/Hubspace-Homeassistant`
+Select the category type `integration`
+Then once it's there (still in HACS) click the INSTALL button
 
 Manual method: copy the hubspace/ folder in the repo to `<config_dir>/custom_components/hubspace/`.
 
 For either method, add the following entry in your `configuration.yaml`:
 
-Do *not* name your lights in the app the same as a room you have defined or the logic will get tripped up: Office, Bedroom, etc   
+Do *not* name your lights in the app the same as a room you have defined or the logic will get tripped up: Office, Bedroom, etc
 
 the notes in () are comments, REMOVE them from your yaml
 ```yaml
@@ -127,7 +136,7 @@ install requests module if not alread installed:
 run script:
 `python TestHubspace.py`
 
-If cannot run python3, get the entity loaded in homeassistant. Set debug:true in configuration as shown above. Click on the entity in homeassistant, expand the attributes, and send me the model and debug fields. This information is *not* anonymized. Best to PM me these on the homeassistant forums, as there is semi-private information in them. Send me these fields with the light set to on/off/etc (you may need to use the app). If that doesn't work, I may need better debug logs. Then you can add in your configuration.yaml (not in the hubspace section). Then you email me your homassistant.log 
+If cannot run python3, get the entity loaded in homeassistant. Set debug:true in configuration as shown above. Click on the entity in homeassistant, expand the attributes, and send me the model and debug fields. This information is *not* anonymized. Best to PM me these on the homeassistant forums, as there is semi-private information in them. Send me these fields with the light set to on/off/etc (you may need to use the app). If that doesn't work, I may need better debug logs. Then you can add in your configuration.yaml (not in the hubspace section). Then you email me your homassistant.log
 ```
 logger:
   default: error
@@ -160,7 +169,7 @@ fan:
           entity_id: light.ceilingfan_fan
           data_template:
             brightness: "{{ ( percentage / 100 * 255) | int }}"
-        speed_count: 4   
+        speed_count: 4
 ```
 
 ### Transformer Support
@@ -193,7 +202,7 @@ lock:
 ```
 
 ### Services:
-The integration now has the capability to send a service. You may want this if there is a capability that is not supported by the integration. However, **do not use this service, if just want to turn lights on/off or anything else supported by the standard light service** (rgb, brightness, colortemp, etc) use the standard light.turn_on , light.turn_off for that.`https://www.home-assistant.io/integrations/light/#service-lightturn_on`. 
+The integration now has the capability to send a service. You may want this if there is a capability that is not supported by the integration. However, **do not use this service, if just want to turn lights on/off or anything else supported by the standard light service** (rgb, brightness, colortemp, etc) use the standard light.turn_on , light.turn_off for that.`https://www.home-assistant.io/integrations/light/#service-lightturn_on`.
 For example, if you want to send the rainbow effect to your rgb light:
 ```
 service: hubspace.send_command
@@ -202,7 +211,7 @@ data:
   functionClass: color-sequence
   functionInstance: custom
 target:
-  entity_id: light.yourlightname  
+  entity_id: light.yourlightname
   ```
 For example, if you want to send the comfort breeze effect to your fan:
 ```
@@ -212,8 +221,8 @@ data:
   functionClass: toggle
   functionInstance: comfort-breeze
 target:
-  entity_id: light.yourlightname  
-  ```  
+  entity_id: light.yourlightname
+  ```
 You do this is the Developers Tools -> Services window. The GUI can be used to choose an entity.
 
 How do you find out what the value, functionClass and functionInstance should be? Look at the output of running TestHubspace.py on your device. If you look around, you will see what your light supports in the "values" field. See https://github.com/jdeath/Hubspace-Homeassistant/blob/main/sample_data/11A21100WRGBWH1.json#L686 . The functionInstance is optional, as not all commands require it. There are some example outputs of TestHubspace.py in the sample_data/ directory of the repo. If you cannot run the TestHubspace.py, then turn on debugging (debug: true in your light: setup). Change the setting in the app, and look at the entity attributes in homeassistant. You should be able to see an entry that has the value, functionClass, etc.
