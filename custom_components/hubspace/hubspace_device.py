@@ -1,9 +1,15 @@
-__all__ = ["HubSpaceDevice", "get_hubspace_devices", "get_devices_cached", "get_device_cached"]
-from typing import Any, Generator
-from dataclasses import dataclass
+__all__ = [
+    "HubSpaceDevice",
+    "get_hubspace_devices",
+    "get_devices_cached",
+    "get_device_cached",
+    "process_range",
+]
 import logging
-from .hubspace import HubSpace
+from dataclasses import dataclass
+from typing import Any, Generator
 
+from .hubspace import HubSpace
 
 logger = logging.getLogger(__name__)
 from cachetools import TTLCache, cached
@@ -20,17 +26,27 @@ class HubSpaceDevice:
     friendly_name: str
     functions: list[dict]
 
-
     def __post_init__(self):
         if not self.model and self.default_image == "ceiling-fan-snyder-park-icon":
             self.model = "DriskolFan"
         if not self.model and self.default_image == "ceiling-fan-vinings-icon":
             self.model = "VinwoodFan"
-        if self.device_class == "fan" and self.model == "TBD" and self.default_image == "ceiling-fan-chandra-icon":
+        if (
+            self.device_class == "fan"
+            and self.model == "TBD"
+            and self.default_image == "ceiling-fan-chandra-icon"
+        ):
             self.model = "ZandraFan"
-        if self.model == "TBD" and self.default_image == "ceiling-fan-ac-cct-dardanus-icon":
+        if (
+            self.model == "TBD"
+            and self.default_image == "ceiling-fan-ac-cct-dardanus-icon"
+        ):
             self.model = "NevaliFan"
-        if self.device_class == "fan" and not self.model and self.default_image == "ceiling-fan-slender-icon":
+        if (
+            self.device_class == "fan"
+            and not self.model
+            and self.default_image == "ceiling-fan-slender-icon"
+        ):
             self.model = "TagerFan"
         if self.model == "Smart Stake Timer":
             self.model = "YardStake"
@@ -57,7 +73,9 @@ def get_devices_from_rooms(data: list[dict], room_names: list[str]) -> list[str]
     return devices
 
 
-def get_devices_from_friendly_names(data: list[dict], friendly_names: list[str]) -> list[str]:
+def get_devices_from_friendly_names(
+    data: list[dict], friendly_names: list[str]
+) -> list[str]:
     """Find all devices related to a room
 
     :param data: API response for the account
@@ -107,7 +125,12 @@ def get_device(hs_device: dict[str, Any]) -> HubSpaceDevice:
     return HubSpaceDevice(**dev_dict)
 
 
-def get_requested_ids(data: list[dict], friendly_names: list[str], room_names: list[str], hashed_devices: dict) -> list[str]:
+def get_requested_ids(
+    data: list[dict],
+    friendly_names: list[str],
+    room_names: list[str],
+    hashed_devices: dict,
+) -> list[str]:
     """Find all devices that need to be discovered
 
     :param data: API response for the account
@@ -128,9 +151,10 @@ def get_requested_ids(data: list[dict], friendly_names: list[str], room_names: l
     return sorted(list(device_ids))
 
 
-def get_hubspace_devices(data: list[dict], friendly_names: list[str], room_names: list[str]) -> Generator:
-    """Generate a HubSpaceDevice for each requested devices
-    """
+def get_hubspace_devices(
+    data: list[dict], friendly_names: list[str], room_names: list[str]
+) -> Generator:
+    """Generate a HubSpaceDevice for each requested devices"""
     hashed_devices = generated_hashed_devices(data)
     device_ids = get_requested_ids(data, friendly_names, room_names, hashed_devices)
     for device_id in device_ids:
@@ -157,3 +181,22 @@ def get_device_cached(hs: HubSpace, child_id: str) -> HubSpaceDevice:
     """
     devices = get_devices_cached(hs)
     return get_device(devices[child_id])
+
+
+def process_range(range_vals: dict) -> list[Any]:
+    """Process a range to determine what's supported
+
+    :param range_vals: Result from functions["values"][x]
+    """
+    supported_range = []
+    range_min = range_vals["range"]["min"]
+    range_max = range_vals["range"]["max"]
+    range_step = range_vals["range"]["step"]
+    if range_min == range_max:
+        supported_range.append(range_max)
+    else:
+        for brightness in range(range_min, range_max, range_step):
+            supported_range.append(brightness)
+        if range_max not in supported_range:
+            supported_range.append(range_max)
+    return supported_range
