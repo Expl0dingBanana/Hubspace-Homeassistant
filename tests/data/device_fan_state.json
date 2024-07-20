@@ -1,0 +1,90 @@
+{
+    "metadeviceId": "ded4b9ef-5e11-4cb6-bc18-aed6d04f6580",
+    "values": [
+        {
+            "functionClass": "toggle",
+            "functionInstance": "comfort-breeze",
+            "value": "enabled",
+            "lastUpdateTime": 1721305800874
+        },
+        {
+            "functionClass": "timer",
+            "functionInstance": "fan-power",
+            "value": 0,
+            "lastUpdateTime": 1720990297397
+        },
+        {
+            "functionClass": "fan-speed",
+            "functionInstance": "fan-speed",
+            "value": "fan-speed-6-016",
+            "lastUpdateTime": 1721485646377
+        },
+        {
+            "functionClass": "fan-reverse",
+            "functionInstance": "fan-reverse",
+            "value": "reverse",
+            "lastUpdateTime": 1721485862816
+        },
+        {
+            "functionClass": "power",
+            "functionInstance": "fan-power",
+            "value": "on",
+            "lastUpdateTime": 1721485003051
+        },
+        {
+            "functionClass": "wifi-ssid",
+            "value": "SSID0",
+            "lastUpdateTime": 1720991560787
+        },
+        {
+            "functionClass": "wifi-rssi",
+            "value": -56,
+            "lastUpdateTime": 1720991759165
+        },
+        {
+            "functionClass": "wifi-steady-state",
+            "value": "connected",
+            "lastUpdateTime": 1720989025857
+        },
+        {
+            "functionClass": "wifi-setup-state",
+            "value": "connected",
+            "lastUpdateTime": 1720989836231
+        },
+        {
+            "functionClass": "wifi-mac-address",
+            "value": "fd51c93dd1d0",
+            "lastUpdateTime": 0
+        },
+        {
+            "functionClass": "geo-coordinates",
+            "functionInstance": "system-device-location",
+            "lastUpdateTime": 1720992029175
+        },
+        {
+            "functionClass": "scheduler-flags",
+            "value": 0,
+            "lastUpdateTime": 1720990849804
+        },
+        {
+            "functionClass": "available",
+            "value": true,
+            "lastUpdateTime": 1721102778383
+        },
+        {
+            "functionClass": "visible",
+            "value": true,
+            "lastUpdateTime": 1721102778383
+        },
+        {
+            "functionClass": "direct",
+            "value": true,
+            "lastUpdateTime": 1721102778383
+        },
+        {
+            "functionClass": "ble-mac-address",
+            "value": "cb7e997398d4",
+            "lastUpdateTime": 0
+        }
+    ]
+}

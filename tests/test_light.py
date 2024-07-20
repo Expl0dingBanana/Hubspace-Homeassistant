@@ -1,9 +1,9 @@
 import json
 import os
 from unittest import mock
-import requests
 
 import pytest
+import requests
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 from custom_components.hubspace import light
@@ -27,7 +27,9 @@ MOCKED_TEST_DATA = {
 current_path = os.path.dirname(os.path.realpath(__file__))
 
 
-with open(os.path.join(current_path, "data", "api_response_single_room.json"), "rb") as fh:
+with open(
+    os.path.join(current_path, "data", "api_response_single_room.json"), "rb"
+) as fh:
     api_single_json = json.load(fh)
 
 
@@ -67,11 +69,7 @@ def validate_hubspace_equals(first, second):
     assert e_vars == exp_vars
 
 
-@pytest.mark.parametrize(
-    "ha_entity, expected", [
-
-    ]
-)
+@pytest.mark.parametrize("ha_entity, expected", [])
 def test_create_ha_entity(ha_entity, expected):
     pass
 
@@ -98,16 +96,7 @@ def test_create_ha_entity(ha_entity, expected):
                         "_deviceId": "80c0c6608a10151f",
                         "_supported_brightness": [x for x in range(1, 101, 1)],
                         "_usePowerFunctionInstance": "light-power",
-                    }
-                ),
-                (
-                    light.HubspaceFan,
-                    {
-                        "_name": "Friendly Name 2",
-                        "_childId": "e60c2391-ca03-49fa-b872-7ad5bb1e2815",
-                        "_model": "ZandraFan",
-                        "_deviceId": "80c0c6608a10151f",
-                    }
+                    },
                 ),
             ],
             [
@@ -115,7 +104,7 @@ def test_create_ha_entity(ha_entity, expected):
                 "Unable to process the entity Friendly Name 1 Fan of class ceiling-fan"
             ],
         ),
-    ]
+    ],
 )
 def test_setup_platform(
     config, data_path, expected_entities, messages, mocked_hubspace, mocker, caplog
@@ -143,52 +132,31 @@ def test_setup_platform(
 
 
 @pytest.mark.parametrize(
-    "values,expected", [
+    "values,expected",
+    [
         (
             api_single_json[2]["description"]["functions"][1]["values"],
             [2700, 3000, 3500, 4000, 5000, 6500],
         ),
-    ]
+    ],
 )
 def test_process_color_temps(values, expected):
     assert light.process_color_temps(values) == expected
 
 
-@pytest.mark.parametrize(
-    "values,expected", [
-        # All the numbers
-        (
-            {"range": {"min": 1, "max": 5, "step": 1}},
-            [1, 2, 3, 4, 5],
-        ),
-        # Some of the numbers
-        (
-            {"range": {"min": 1, "max": 5, "step": 2}},
-            [1, 3, 5],
-        ),
-        # Max only
-        (
-            {"range": {"min": 5, "max": 5, "step": 2}},
-            [5],
-        ),
-    ]
-)
-def test_process_brightness(values, expected):
-    assert light.process_brightness(values) == expected
-
-
 # @TODO - Add additional tests that support RGB and color-mode
 @pytest.mark.parametrize(
-    "api_response_file, expected_attrs", [
+    "api_response_file, expected_attrs",
+    [
         (
             "light_states.json",
             {
                 "_state": "on",
                 "_colorTemp": "3500",
                 "_brightness": 102,
-            }
+            },
         ),
-    ]
+    ],
 )
 def test_HubSpaceLight_update(api_response_file, expected_attrs, mocked_hubspace):
     with open(os.path.join(current_path, "data", api_response_file), "rb") as fh:

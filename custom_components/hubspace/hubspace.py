@@ -588,7 +588,6 @@ class HubSpace:
         r.close()
         r.raise_for_status()
 
-
     def setStateInstance(self, child, desiredStateName, desiredFunctionInstance, state):
 
         token = self.getAuthTokenFromRefreshToken()

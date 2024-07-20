@@ -1,7 +1,8 @@
 import json
 import os
-import requests
+
 import pytest
+import requests
 
 from custom_components.hubspace import hubspace_device
 
@@ -485,7 +486,9 @@ def test_get_devices_cached(mocker, mocked_hubspace):
     resp.status_code = 200
     resp._content = json.dumps(api_single).encode()
     resp.encoding = "utf-8"
-    getMetadeviceInfo = mocker.patch.object(mocked_hubspace, "getMetadeviceInfo", return_value=resp)
+    getMetadeviceInfo = mocker.patch.object(
+        mocked_hubspace, "getMetadeviceInfo", return_value=resp
+    )
     devices = hubspace_device.get_devices_cached(mocked_hubspace)
     assert "b1e1213f-9b8e-40c6-96b5-cdee6cf85315" in devices
     assert getMetadeviceInfo.call_count == 1
@@ -500,6 +503,32 @@ def test_get_device_cached(mocker, mocked_hubspace):
     resp._content = json.dumps(api_single).encode()
     resp.encoding = "utf-8"
     mocker.patch.object(mocked_hubspace, "getMetadeviceInfo", return_value=resp)
-    device = hubspace_device.get_device_cached(mocked_hubspace, "b1e1213f-9b8e-40c6-96b5-cdee6cf85315")
+    device = hubspace_device.get_device_cached(
+        mocked_hubspace, "b1e1213f-9b8e-40c6-96b5-cdee6cf85315"
+    )
     assert isinstance(device, hubspace_device.HubSpaceDevice)
     assert device.id == "b1e1213f-9b8e-40c6-96b5-cdee6cf85315"
+
+
+@pytest.mark.parametrize(
+    "values,expected",
+    [
+        # All the numbers
+        (
+            {"range": {"min": 1, "max": 5, "step": 1}},
+            [1, 2, 3, 4, 5],
+        ),
+        # Some of the numbers
+        (
+            {"range": {"min": 1, "max": 5, "step": 2}},
+            [1, 3, 5],
+        ),
+        # Max only
+        (
+            {"range": {"min": 5, "max": 5, "step": 2}},
+            [5],
+        ),
+    ],
+)
+def test_process_range(values, expected):
+    assert hubspace_device.process_range(values) == expected
