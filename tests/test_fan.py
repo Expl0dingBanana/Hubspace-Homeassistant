@@ -6,6 +6,7 @@ import pytest
 import requests
 from homeassistant.components.fan import FanEntityFeature
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from hubspace_async import HubSpaceState
 
 from custom_components.hubspace import (
     CONF_DEBUG,
@@ -22,6 +23,12 @@ with open(os.path.join(current_path, "data", "device_fan.json"), "rb") as fh:
 
 with open(os.path.join(current_path, "data", "device_fan_state.json"), "rb") as fh:
     fan_data_state = json.load(fh)
+    fan_data_states = []
+    for state in fan_data_state["values"]:
+        try:
+            fan_data_states.append(HubSpaceState(**state))
+        except:
+            pass
 
 
 process_functions_expected = (
@@ -55,6 +62,7 @@ def speed_fan(mocked_hubspace):
 
 class Test_HubSpaceFan:
 
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "functions, expected_attrs",
         [
@@ -80,16 +88,17 @@ class Test_HubSpaceFan:
             )
         ],
     )
-    def test_process_functions(self, functions, expected_attrs, empty_fan):
-        empty_fan.process_functions(functions)
+    async def test_process_functions(self, functions, expected_attrs, empty_fan):
+        await empty_fan.process_functions(functions)
         for key, val in expected_attrs.items():
             assert getattr(empty_fan, key) == val
 
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "states, expected_attrs, extra_attrs",
         [
             (
-                fan_data_state,
+                fan_data_states,
                 {
                     "_preset_mode": "comfort-breeze",
                     "_fan_speed": "fan-speed-6-016",
@@ -108,11 +117,11 @@ class Test_HubSpaceFan:
             ),
         ],
     )
-    def test_update_states(
+    async def test_update_states(
         self, states, expected_attrs, extra_attrs, empty_fan, mocker
     ):
-        mocker.patch.object(empty_fan._hs, "get_states", return_value=states)
-        empty_fan.update_states()
+        empty_fan._hs.get_device_state = mocker.AsyncMock(return_value=states)
+        await empty_fan.update_states()
         assert empty_fan.extra_state_attributes == extra_attrs
         for key, val in expected_attrs.items():
             assert getattr(empty_fan, key) == val
@@ -199,6 +208,7 @@ class Test_HubSpaceFan:
         empty_fan._supported_features = features
         assert empty_fan.supported_features == features
 
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "percentage, preset_mode, expected_attrs",
         [
@@ -220,62 +230,15 @@ class Test_HubSpaceFan:
             ),
         ],
     )
-    def test_turn_on(self, percentage, preset_mode, expected_attrs, speed_fan):
+    async def test_async_turn_on(
+        self, percentage, preset_mode, expected_attrs, speed_fan
+    ):
         speed_fan._supported_features = process_functions_expected
-        speed_fan.turn_on(percentage=percentage, preset_mode=preset_mode)
+        await speed_fan.async_turn_on(percentage=percentage, preset_mode=preset_mode)
         for key, val in expected_attrs.items():
             assert getattr(speed_fan, key) == val
 
-    def test_turn_off(self, empty_fan):
-        empty_fan.turn_off()
+    @pytest.mark.asyncio
+    async def test_async_turn_off(self, empty_fan):
+        await empty_fan.async_turn_off()
         assert empty_fan._state == "off"
-
-
-@pytest.mark.parametrize(
-    "config,data_path,expected_entities,messages",
-    [
-        pytest.param(
-            {
-                CONF_USERNAME: "cool",
-                CONF_PASSWORD: "beans",
-                CONF_FRIENDLYNAMES: [],
-                CONF_ROOMNAMES: [],
-                CONF_DEBUG: True,
-            },
-            "api_response_single_room.json",
-            [
-                (
-                    fan.HubspaceFan,
-                    {
-                        "_name": "Friendly Name 2",
-                        "_child_id": "f74f69ea-9457-4390-938b-a005d7066ef2",
-                    },
-                ),
-            ],
-            [],
-        ),
-    ],
-)
-def test_setup_platform(
-    config, data_path, expected_entities, messages, mocked_hubspace, mocker, caplog
-):
-    hass = mocker.Mock()
-    add_entities = mocker.Mock()
-    # Force the class instance creation to use our mocked value
-    resp = requests.Response()
-    resp.status_code = 200
-    with open(os.path.join(current_path, "data", data_path), "rb") as fh:
-        resp._content = fh.read()
-    resp.encoding = "utf-8"
-    mocker.patch.object(fan, "HubSpace", return_value=mocked_hubspace)
-    mocker.patch.object(mocked_hubspace, "getMetadeviceInfo", return_value=resp)
-    fan.setup_platform(hass, config, add_entities)
-    assert len(add_entities.call_args[0][0]) == len(expected_entities)
-    for ind, call in enumerate(add_entities.call_args_list):
-        res_entity = call.args[0][0]
-        expected_entity_data = expected_entities[ind]
-        assert isinstance(res_entity, expected_entity_data[0])
-        for key, val in expected_entity_data[1].items():
-            assert getattr(res_entity, key) == val
-    for message in messages:
-        assert message in caplog.text

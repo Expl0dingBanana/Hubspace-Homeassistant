@@ -1,2 +1,3 @@
 homeassistant
 cachetools
+hubspace-async

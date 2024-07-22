@@ -14,16 +14,15 @@ from homeassistant.util.percentage import (
     percentage_to_ordered_list_item,
 )
 
-from . import hubspace_device
+from . import discovery
 
 logger = logging.getLogger(__name__)
 
 # Import the device class from the component that you want to support
 from homeassistant.components.fan import FanEntity, FanEntityFeature
+from hubspace_async import HubSpaceConnection, HubSpaceDevice, HubSpaceState
 
 from . import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
-from .hubspace import HubSpace
-from .hubspace_device import process_range
 
 PRESET_HS_TO_HA = {"comfort-breeze": "breeze"}
 
@@ -61,7 +60,7 @@ class HubspaceFan(FanEntity):
 
     def __init__(
         self,
-        hs: HubSpace,
+        hs: HubSpaceConnection,
         friendly_name: str,
         child_id: Optional[str] = None,
         model: Optional[str] = None,
@@ -84,11 +83,19 @@ class HubspaceFan(FanEntity):
             "Child ID": self._child_id,
         }
         self._instance_attrs: dict[str, str] = {}
-        self.update_states()
-        if functions:
-            self.process_functions(functions)
+        self._functions: list[dict[str, Any]] = functions or []
 
-    def process_functions(self, functions: list[dict]) -> None:
+    def __await__(self):
+        return self.create().__await__()
+
+    async def create(self):
+        await self.async_update()
+        if self._functions:
+            await self.process_functions(self._functions)
+            self._functions = None
+        return self
+
+    async def process_functions(self, functions: list[dict]) -> None:
         """Process available functions
 
         :param functions: Functions that are supported from the API
@@ -109,11 +116,7 @@ class HubspaceFan(FanEntity):
                 self._supported_features |= FanEntityFeature.SET_SPEED
                 tmp_speed = set()
                 for value in function["values"]:
-                    # I am not sure fan speeds will be a range, but providing that
-                    # functionality
-                    if value["range"]:
-                        tmp_speed = set(process_range(value["range"]))
-                    elif not value["name"].endswith("-000"):
+                    if not value["name"].endswith("-000"):
                         tmp_speed.add(value["name"])
                 self._fan_speeds = list(sorted(tmp_speed))
                 logger.debug("Adding a new feature - fan speed, %s", self._fan_speeds)
@@ -130,9 +133,9 @@ class HubspaceFan(FanEntity):
                 logger.debug("Unsupported feature found, %s", function["functionClass"])
                 self._instance_attrs.pop(function["functionClass"], None)
 
-    def update_states(self) -> None:
+    async def update_states(self) -> None:
         """Load initial states into the device"""
-        states = self._hs.get_states(self._child_id)
+        states: list[HubSpaceState] = await self._hs.get_device_state(self._child_id)
         additional_attrs = [
             "wifi-ssid",
             "wifi-mac-address",
@@ -140,21 +143,18 @@ class HubspaceFan(FanEntity):
             "ble-mac-address",
         ]
         # functionClass -> internal attribute
-        for state in states["values"]:
-            if state["functionClass"] == "toggle":
-                if state["value"] == "enabled":
-                    self._preset_mode = state["functionInstance"]
-            elif state["functionClass"] == "fan-speed":
-                self._fan_speed = state["value"]
-            elif state["functionClass"] == "fan-reverse":
-                self._current_direction = state["value"]
-            elif state["functionClass"] == "power":
-                self._state = state["value"]
-            elif state["functionClass"] in additional_attrs:
-                self._bonus_attrs[state["functionClass"]] = state["value"]
-
-    def update(self):
-        self.update_states()
+        for state in states:
+            if state.functionClass == "toggle":
+                if state.value == "enabled":
+                    self._preset_mode = state.functionInstance
+            elif state.functionClass == "fan-speed":
+                self._fan_speed = state.value
+            elif state.functionClass == "fan-reverse":
+                self._current_direction = state.value
+            elif state.functionClass == "power":
+                self._state = state.value
+            elif state.functionClass in additional_attrs:
+                self._bonus_attrs[state.functionClass] = state.value
 
     @property
     def name(self) -> str:
@@ -215,97 +215,97 @@ class HubspaceFan(FanEntity):
     def should_poll(self):
         return True
 
-    def turn_on(
+    async def async_update(self):
+        await self.update_states()
+
+    async def async_turn_on(
         self,
         percentage: Optional[int] = None,
         preset_mode: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Turn on the fan."""
-        state_updates = []
         with suppress(AttributeError):
             if not self._supported_features & FanEntityFeature.TURN_ON:
                 raise NotImplementedError
         self._state = "on"
-        state_updates.append(
-            {
-                "functionClass": "power",
-                "functionInstance": self._instance_attrs.get("power", None),
-                "value": "on",
-            }
+        power_state = HubSpaceState(
+            functionClass="power",
+            functionInstance=self._instance_attrs.get("power", None),
+            value="on",
         )
-        self._hs.set_states(self._child_id, state_updates)
-        self.set_percentage(percentage)
-        self.set_preset_mode(preset_mode)
+        await self._hs.set_device_state(self._child_id, power_state)
+        await self.async_set_percentage(percentage)
+        await self.async_set_preset_mode(preset_mode)
 
-    def turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
         with suppress(AttributeError):
             if not self._supported_features & FanEntityFeature.TURN_OFF:
                 raise NotImplementedError
         self._state = "off"
-        state_updates = [
-            {
-                "functionClass": "power",
-                "functionInstance": self._instance_attrs.get("power", None),
-                "value": "off",
-            }
-        ]
-        self._hs.set_states(self._child_id, state_updates)
+        power_state = HubSpaceState(
+            functionClass="power",
+            functionInstance=self._instance_attrs.get("power", None),
+            value="off",
+        )
+        await self._hs.set_device_state(self._child_id, power_state)
 
-    def set_percentage(self, percentage: int) -> None:
+    async def async_set_percentage(self, percentage: int) -> None:
         """Set the speed percentage of the fan."""
         if self._supported_features & FanEntityFeature.SET_SPEED:
             self._fan_speed = percentage_to_ordered_list_item(
                 self._fan_speeds, percentage
             )
-            self._hs.setState(
-                self._child_id,
-                "fan-speed",
-                self._fan_speed,
-                instanceField=self._instance_attrs.get("fan-speed", None),
+            speed_state = HubSpaceState(
+                functionClass="fan-speed",
+                functionInstance=self._instance_attrs.get("fan-speed", None),
+                value=self._fan_speed,
             )
+            await self._hs.set_device_state(self._child_id, speed_state)
 
-    def set_preset_mode(self, preset_mode: str) -> None:
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set the preset mode of the fan."""
         if self._supported_features & FanEntityFeature.PRESET_MODE:
             if not preset_mode:
-                self._hs.setState(
-                    self._child_id,
-                    "toggle",
-                    "disabled",
-                    instanceField=self._preset_mode,
-                )
                 self._preset_mode = None
+                preset_state = HubSpaceState(
+                    functionClass="toggle",
+                    functionInstance=self._preset_mode,
+                    value="disabled",
+                )
             else:
                 self._preset_mode = PRESET_HS_TO_HA.get(preset_mode, None)
-                self._hs.setState(
-                    self._child_id, "toggle", "enabled", instanceField=self._preset_mode
+                preset_state = HubSpaceState(
+                    functionClass="toggle",
+                    functionInstance=self._preset_mode,
+                    value="enabled",
                 )
+            await self._hs.set_device_state(self._child_id, preset_state)
 
-    def set_direction(self, direction: str) -> None:
+    async def async_set_direction(self, direction: str) -> None:
         """Set the direction of the fan."""
         if self._supported_features & FanEntityFeature.DIRECTION:
             self._current_direction = direction
-            self._hs.setState(
-                self._child_id,
-                "fan-reverse",
-                direction,
-                instanceField=self._instance_attrs.get("fan-reverse", None),
+            direction_state = HubSpaceState(
+                functionClass="fan-reverse",
+                functionInstance=self._instance_attrs.get("fan-reverse", None),
+                value=direction,
             )
+            await self._hs.set_device_state(self._child_id, direction_state)
 
 
-def setup_platform(
+async def async_setup_platform(
     hass: HomeAssistant,
     config: ConfigType,
-    add_entities: AddEntitiesCallback,
+    async_add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Add all fans"""
     username = config[CONF_USERNAME]
     password = config.get(CONF_PASSWORD)
     try:
-        hs = HubSpace(username, password)
+        hs = HubSpaceConnection(username, password)
     except requests.exceptions.ReadTimeout as ex:
         # Where does this exception come from? The integration will break either way
         # but more spectacularly since the exception is not imported
@@ -316,16 +316,13 @@ def setup_platform(
     entities = []
     friendly_names: list[str] = config.get(CONF_FRIENDLYNAMES, [])
     room_names: list[str] = config.get(CONF_ROOMNAMES, [])
-    data = hs.getMetadeviceInfo().json()
-    for entity in hubspace_device.get_hubspace_devices(
-        data, friendly_names, room_names
-    ):
+    for entity in await discovery.get_requested_devices(hs, friendly_names, room_names):
         if entity.device_class != "fan":
             logger.debug(
                 f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"
             )
             continue
-        ha_entity = HubspaceFan(
+        ha_entity = await HubspaceFan(
             hs,
             entity.friendly_name,
             child_id=entity.id,
@@ -335,4 +332,4 @@ def setup_platform(
         )
         logger.debug(f"Adding an entity {ha_entity._child_id}")
         entities.append(ha_entity)
-    add_entities(entities)
+    async_add_entities(entities)

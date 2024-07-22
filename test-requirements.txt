@@ -1,4 +1,5 @@
 pytest
 pytest-mock
+pytest_asyncio
 responses
 pre-commit
