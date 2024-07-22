@@ -6,6 +6,7 @@ import pytest
 import requests
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
+import custom_components.hubspace.const
 from custom_components.hubspace import light
 
 MOCKED_CHILD_DATA = ["child_id", "model", "deviceId", "deviceClass"]
@@ -81,9 +82,9 @@ def test_create_ha_entity(ha_entity, expected):
             {
                 CONF_USERNAME: "cool",
                 CONF_PASSWORD: "beans",
-                light.CONF_FRIENDLYNAMES: [],
-                light.CONF_ROOMNAMES: [],
-                light.CONF_DEBUG: True,
+                custom_components.hubspace.const.CONF_FRIENDLYNAMES: [],
+                custom_components.hubspace.const.CONF_ROOMNAMES: [],
+                custom_components.hubspace.const.CONF_DEBUG: True,
             },
             "api_response_single_room.json",
             [

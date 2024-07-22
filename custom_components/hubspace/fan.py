@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 from homeassistant.components.fan import FanEntity, FanEntityFeature
 from hubspace_async import HubSpaceConnection, HubSpaceDevice, HubSpaceState
 
-from . import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
+from .const import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
 
 PRESET_HS_TO_HA = {"comfort-breeze": "breeze"}
 

@@ -8,11 +8,11 @@ from homeassistant.components.fan import FanEntityFeature
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from hubspace_async import HubSpaceState
 
-from custom_components.hubspace import (
+from custom_components.hubspace import fan
+from custom_components.hubspace.const import (
     CONF_DEBUG,
     CONF_FRIENDLYNAMES,
     CONF_ROOMNAMES,
-    fan,
 )
 
 current_path = os.path.dirname(os.path.realpath(__file__))

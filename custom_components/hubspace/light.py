@@ -25,7 +25,8 @@ from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import Any, ConfigType, DiscoveryInfoType
 
-from . import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES, hubspace_device
+from . import hubspace_device
+from .const import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
 from .hubspace import HubSpace
 
 SCAN_INTERVAL = timedelta(seconds=30)

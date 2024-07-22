@@ -2,6 +2,7 @@
   "domain": "hubspace",
   "name": "hubspace",
   "codeowners": ["@jdeath"],
+  "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/jdeath/Hubspace-Homeassistant/blob/main/README.md",
   "iot_class": "cloud_polling",
