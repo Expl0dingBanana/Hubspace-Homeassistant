@@ -4,32 +4,30 @@ import logging
 from contextlib import suppress
 from typing import Any, Optional, Union
 
-import requests
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.percentage import (
     ordered_list_item_to_percentage,
     percentage_to_ordered_list_item,
 )
 
-from . import discovery
+from .const import DOMAIN
 
 logger = logging.getLogger(__name__)
 
-# Import the device class from the component that you want to support
 from homeassistant.components.fan import FanEntity, FanEntityFeature
-from hubspace_async import HubSpaceConnection, HubSpaceDevice, HubSpaceState
+from hubspace_async import HubSpaceState
 
-from .const import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
+from . import HubSpaceConfigEntry
+from .coordinator import HubSpaceDataUpdateCoordinator
 
 PRESET_HS_TO_HA = {"comfort-breeze": "breeze"}
 
 PRESET_HA_TO_HS = {val: key for key, val in PRESET_HS_TO_HA.items()}
 
 
-class HubspaceFan(FanEntity):
+class HubspaceFan(CoordinatorEntity, FanEntity):
     """HubSpace fan that can communicate with Home Assistant
 
     :ivar _name: Name of the device
@@ -60,7 +58,7 @@ class HubspaceFan(FanEntity):
 
     def __init__(
         self,
-        hs: HubSpaceConnection,
+        hs: HubSpaceDataUpdateCoordinator,
         friendly_name: str,
         child_id: Optional[str] = None,
         model: Optional[str] = None,
@@ -68,7 +66,8 @@ class HubspaceFan(FanEntity):
         functions: Optional[list[dict]] = None,
     ) -> None:
         self._name: str = friendly_name
-        self._hs = hs
+        self.coordinator = hs
+        self._hs = hs.conn
         self._child_id: str = child_id
         self._state: Optional[str] = None
         self._current_direction: Optional[str] = None
@@ -84,6 +83,13 @@ class HubspaceFan(FanEntity):
         }
         self._instance_attrs: dict[str, str] = {}
         self._functions: list[dict[str, Any]] = functions or []
+        super().__init__(hs, context=self._child_id)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.update_states()
+        self.async_write_ha_state()
 
     def __await__(self):
         return self.create().__await__()
@@ -133,9 +139,9 @@ class HubspaceFan(FanEntity):
                 logger.debug("Unsupported feature found, %s", function["functionClass"])
                 self._instance_attrs.pop(function["functionClass"], None)
 
-    async def update_states(self) -> None:
+    def update_states(self) -> None:
         """Load initial states into the device"""
-        states: list[HubSpaceState] = await self._hs.get_device_state(self._child_id)
+        states: list[HubSpaceState] = self.coordinator.data["states"][self._child_id]
         additional_attrs = [
             "wifi-ssid",
             "wifi-mac-address",
@@ -213,10 +219,7 @@ class HubspaceFan(FanEntity):
 
     @property
     def should_poll(self):
-        return True
-
-    async def async_update(self):
-        await self.update_states()
+        return False
 
     async def async_turn_on(
         self,
@@ -237,6 +240,7 @@ class HubspaceFan(FanEntity):
         await self._hs.set_device_state(self._child_id, power_state)
         await self.async_set_percentage(percentage)
         await self.async_set_preset_mode(preset_mode)
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
@@ -250,10 +254,14 @@ class HubspaceFan(FanEntity):
             value="off",
         )
         await self._hs.set_device_state(self._child_id, power_state)
+        self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the speed percentage of the fan."""
-        if self._supported_features & FanEntityFeature.SET_SPEED:
+        if (
+            self._supported_features & FanEntityFeature.SET_SPEED
+            and percentage is not None
+        ):
             self._fan_speed = percentage_to_ordered_list_item(
                 self._fan_speeds, percentage
             )
@@ -263,6 +271,7 @@ class HubspaceFan(FanEntity):
                 value=self._fan_speed,
             )
             await self._hs.set_device_state(self._child_id, speed_state)
+            self.async_write_ha_state()
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set the preset mode of the fan."""
@@ -282,6 +291,7 @@ class HubspaceFan(FanEntity):
                     value="enabled",
                 )
             await self._hs.set_device_state(self._child_id, preset_state)
+            self.async_write_ha_state()
 
     async def async_set_direction(self, direction: str) -> None:
         """Set the direction of the fan."""
@@ -293,43 +303,33 @@ class HubspaceFan(FanEntity):
                 value=direction,
             )
             await self._hs.set_device_state(self._child_id, direction_state)
+            self.async_write_ha_state()
 
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
+    entry: HubSpaceConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Add all fans"""
-    username = config[CONF_USERNAME]
-    password = config.get(CONF_PASSWORD)
-    try:
-        hs = HubSpaceConnection(username, password)
-    except requests.exceptions.ReadTimeout as ex:
-        # Where does this exception come from? The integration will break either way
-        # but more spectacularly since the exception is not imported
-        raise PlatformNotReady(
-            f"Connection error while connecting to hubspace: {ex}"
-        ) from ex
-
-    entities = []
-    friendly_names: list[str] = config.get(CONF_FRIENDLYNAMES, [])
-    room_names: list[str] = config.get(CONF_ROOMNAMES, [])
-    for entity in await discovery.get_requested_devices(hs, friendly_names, room_names):
+    """Add Fan entities from a config_entry."""
+    coordinator_hubspace: HubSpaceDataUpdateCoordinator = (
+        entry.runtime_data.coordinator_hubspace
+    )
+    fans: list[HubspaceFan] = []
+    for entity in coordinator_hubspace.data["devices"]:
         if entity.device_class != "fan":
             logger.debug(
                 f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"
             )
             continue
         ha_entity = await HubspaceFan(
-            hs,
+            coordinator_hubspace,
             entity.friendly_name,
             child_id=entity.id,
             model=entity.model,
             device_id=entity.device_id,
             functions=entity.functions,
         )
-        logger.debug(f"Adding an entity {ha_entity._child_id}")
-        entities.append(ha_entity)
-    async_add_entities(entities)
+        logger.debug(f"Adding a fan, {ha_entity._child_id}")
+        fans.append(ha_entity)
+    async_add_entities(fans)

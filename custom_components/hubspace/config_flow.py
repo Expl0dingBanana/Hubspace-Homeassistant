@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
+from asyncio import timeout
 from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, HANDLERS
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-# from hubspace_async import HubSpaceConnection
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.const import CONF_NAME, CONF_PASSWORD, CONF_USERNAME
+from hubspace_async import HubSpaceConnection
 
 from .const import CONF_FRIENDLYNAMES, CONF_ROOMNAMES, DOMAIN
 
@@ -26,7 +27,6 @@ PLATFORM_SCHEMA = vol.Schema(
 )
 
 
-@HANDLERS.register(DOMAIN)
 class HubSpaceConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for HubSpace"""
 
@@ -41,6 +41,24 @@ class HubSpaceConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
         errors = {}
+
+        if user_input is not None:
+            try:
+                async with timeout(10):
+                    conn = HubSpaceConnection(
+                        user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                    )
+                    await conn.get_account_id()
+            except TimeoutError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                errors["unknown"] = "generic"
+            else:
+                await self.async_set_unique_id(
+                    await conn.account_id, raise_on_progress=False
+                )
+
+                return self.async_create_entry(title=DOMAIN, data=user_input)
 
         return self.async_show_form(
             step_id="user",
