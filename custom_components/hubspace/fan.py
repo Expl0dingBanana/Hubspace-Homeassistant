@@ -102,7 +102,9 @@ class HubspaceFan(FanEntity):
                 self._supported_features |= FanEntityFeature.PRESET_MODE
                 self._preset_modes.add(function["functionInstance"])
                 self._instance_attrs.pop(function["functionClass"])
-                logger.debug("Adding a new feature - preset, %s", function["functionInstance"])
+                logger.debug(
+                    "Adding a new feature - preset, %s", function["functionInstance"]
+                )
             elif function["functionClass"] == "fan-speed":
                 self._supported_features |= FanEntityFeature.SET_SPEED
                 tmp_speed = set()
@@ -242,7 +244,7 @@ class HubspaceFan(FanEntity):
             if not self._supported_features & FanEntityFeature.TURN_OFF:
                 raise NotImplementedError
         self._state = "off"
-        state_updates =[
+        state_updates = [
             {
                 "functionClass": "power",
                 "functionInstance": self._instance_attrs.get("power", None),
@@ -257,23 +259,40 @@ class HubspaceFan(FanEntity):
             self._fan_speed = percentage_to_ordered_list_item(
                 self._fan_speeds, percentage
             )
-            self._hs.setState(self._child_id, "fan-speed", self._fan_speed, instanceField=self._instance_attrs.get("fan-speed", None))
+            self._hs.setState(
+                self._child_id,
+                "fan-speed",
+                self._fan_speed,
+                instanceField=self._instance_attrs.get("fan-speed", None),
+            )
 
     def set_preset_mode(self, preset_mode: str) -> None:
         """Set the preset mode of the fan."""
         if self._supported_features & FanEntityFeature.PRESET_MODE:
             if not preset_mode:
-                self._hs.setState(self._child_id, "toggle", "disabled", instanceField=self._preset_mode)
+                self._hs.setState(
+                    self._child_id,
+                    "toggle",
+                    "disabled",
+                    instanceField=self._preset_mode,
+                )
                 self._preset_mode = None
             else:
                 self._preset_mode = PRESET_HS_TO_HA.get(preset_mode, None)
-                self._hs.setState(self._child_id, "toggle","enabled", instanceField=self._preset_mode)
+                self._hs.setState(
+                    self._child_id, "toggle", "enabled", instanceField=self._preset_mode
+                )
 
     def set_direction(self, direction: str) -> None:
         """Set the direction of the fan."""
         if self._supported_features & FanEntityFeature.DIRECTION:
             self._current_direction = direction
-            self._hs.setState(self._child_id, "fan-reverse", direction, instanceField=self._instance_attrs.get("fan-reverse", None))
+            self._hs.setState(
+                self._child_id,
+                "fan-reverse",
+                direction,
+                instanceField=self._instance_attrs.get("fan-reverse", None),
+            )
 
 
 def setup_platform(
@@ -302,7 +321,9 @@ def setup_platform(
         data, friendly_names, room_names
     ):
         if entity.device_class != "fan":
-            logger.debug(f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}")
+            logger.debug(
+                f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"
+            )
             continue
         ha_entity = HubspaceFan(
             hs,
