@@ -33,8 +33,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HubSpaceData) -> bool:
     coordinator_hubspace = HubSpaceDataUpdateCoordinator(
         hass,
         conn,
-        entry.data[CONF_FRIENDLYNAMES],
-        entry.data[CONF_ROOMNAMES],
+        [],
+        [],
         UPDATE_INTERVAL_OBSERVATION,
     )
 

@@ -146,7 +146,9 @@ async def async_setup_entry(
                     model=entity.model,
                     device_id=entity.device_id,
                 )
-                logger.debug(f"Adding a %s [%s] @ %s", entity.device_class, entity.id, _instance)
+                logger.debug(
+                    f"Adding a %s [%s] @ %s", entity.device_class, entity.id, _instance
+                )
                 entities.append(ha_entity)
         else:
             logger.debug(

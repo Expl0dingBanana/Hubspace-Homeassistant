@@ -5,17 +5,17 @@
             "user": {
                 "data": {
                     "username": "Username",
-                    "password": "Password",
-                    "roomnames": "roomnames",
-                    "friendlynames": "friendlynames"
+                    "password": "Password"
                 },
                 "data_description": {
                     "username": "Username",
-                    "password": "Password",
-                    "roomnames": "roomnames",
-                    "friendlynames": "friendlynames"
+                    "password": "Password"
                 }
             }
+        },
+        "errors": {
+            "base": "Connection timed out",
+            "unknown": "Unable to authentication. Please verify Username and Password"
         }
     },
     "services": {

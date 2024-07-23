@@ -7,6 +7,8 @@ HubSpace is reliant on a cloud connection which means this integration could bre
 devices may be supported with and developer time will be required to add new devices.
 
 ### Breaking Change:
+Configuration is done through the `Add Integrations` rather than configuration.yaml.
+
 Now supports services for capability not provided by the integration. See Services section below
 
 Thanks to @dloveall this release will automatically discover most devices. Specifying your friendlynames is still possible, but this now finds most models attached to your account. There may be some that are not auto discovered.
@@ -16,51 +18,12 @@ Since some of the internals were changed, so your light name may change. For ins
 To solve this, go to Settings->Devices and Services->Entities
 find the light.friendlyname and delete it. then find the light.friendlyname_2 and rename it light.friendlyname
 
-TEMPORARY:
-The following entity types have been removed:
-
- * Outlets
- * Transformer
- * Water Time
-
-Configuration of fans requires a new entry in ``configuration.yaml``. It is the same as ``light``, but
-the key is ``fan``.
-
 ### Information :
-99% of the issues are that your friendlyname is incorrect, see Troubleshooting section below. Please use the issue section only for support of new devices.
-
-Major rewrite. Now it caches tokens for 118s and shares authentication for all lights, thus makes fewer API calls
-
-Supports on/off for a couple types of light strips: 'AL-TP-RGBCW-60-2116, AL-TP-RGBCW-60-2232'
-
-RGB working for: '50291, 50292' and 11PR38120RGBWH1. No brightness or White Colortemp yet
-
-RGB (and maybe brightness) working for: '538551010, 538561010, 538552010, 538562010'
-
-Light on/off/dim and fan on/off/low/med/high/full for '52133, 37833' fan and "Driskol 60 inch Fan" and "Zandra" and "Vinwood" and "Nevali". Fan speed is controlled like a light dimmer. Fans are a real pain to support!
-
-On/Off,Brightness: PIR switch (HPDA311CWB)
-
-Outlets (HPKA315CWB) work with on/off on both outputs.
-Single outlet (HPPA51CWB and HPPA11AWBA023) models handled correctly
-
-Support for 4 outlet LTS-4G-W strip
-
-Single non-dimming lightswitch (HPSA11CWB) works
-
-Landscape Transformer (HB-200-1215WIFIB) works with on/off on all 3 outputs. System-wide Watts and voltage available as attribute in first output entity
-
-Support for outdoor string lights: HB-10521-HS and maybe HB-17122-HS-WT
-
-Support for L08557 outdoor RGBW Stake Light and Smart Outdoor Power Stake
-
-Support for Husky Smart Watering Timer.
-
-Hubspace/Defiant WiFi Deadbolt support: On=Lock, Off=Unlocked . Auto discover does not yet work for the luck nor the plug it comes with, so friendlynames are required. Recommend using a template entity to show up as a lock to Home Assistant, see below. I plan to make a local Bluetooth integration for the lock, but making slow progress.
-
-I would like to update to cloud push, but right now polls the state every minute by default (can be overwritten with scan_interval). Please contact me if you're good with websockets. The websocket system pushes bad data at first, which messses up the connection. I need a way to ignore that data.
-
-Could use an expert to make everything async. I tried to convert it over, but could not get it working.
+This integration talks to the HubSpace API to set and retrieve states for all
+of your registered devices. After performing the configuration, it will
+register all devices unless specified by `friendlyNames` and/or `roomNames`. Once
+the devices are discovered, it will determine device capability and show
+correctly within Home Assistant.
 
 _Thanks to everyone who starred my repo! To star it click on the image below, then it will be on top right. Thanks!_
 
@@ -68,11 +31,14 @@ _Thanks to everyone who starred my repo! To star it click on the image below, th
 
 ### Installation
 
-Preferred method: Add this repo as a custom repository in [HACS](https://hacs.xyz/). Add the hubspace integration.
+
+#### UI (Preferred)
+Add this repo as a custom repository in [HACS](https://hacs.xyz/). Add the hubspace integration.
 
 Clicking this badge should add the repo for you:
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jdeath&repository=Hubspace-Homeassistant&category=integration)
 
+#### Manual
 Manually add repo:
 Adding a custom repo directions `https://hacs.xyz/docs/faq/custom_repositories/`
 Use the custom repo link `https://github.com/jdeath/Hubspace-Homeassistant`
@@ -81,29 +47,16 @@ Then once it's there (still in HACS) click the INSTALL button
 
 Manual method: copy the hubspace/ folder in the repo to `<config_dir>/custom_components/hubspace/`.
 
-For either method, add the following entry in your `configuration.yaml`:
+### Configuration
+After HubSpace has been added through HACs and Home Assistant has been removed, the
+configuration continues within the UI like other integrations. First select `Settings`
+on the navigation bar, then select `Devices & services`, ensure you are on the
+`Integrations` tab, then finally select `ADD INTEGRATION` at the bottom right
+of the page. Search for `HubSpace` and enter your username and password and
+click `SUBMIT`. After the credentials are authentication, you will be
+prompted for automatic discovery, or manually select devices / rooms.
 
-Do *not* name your lights in the app the same as a room you have defined or the logic will get tripped up: Office, Bedroom, etc
 
-the notes in () are comments, REMOVE them from your yaml
-```yaml
-light:
-  - platform: hubspace
-    username: your_hubspace_username #(probably your email address)
-    password: your_hubspace_password
-    debug: false #(use true if want debug output, if you have an unsupported light. set false if not needed)
-    friendlynames: #(optional after v1.70)
-      - 'BoysLight' #(the name of your light as shown in the app)
-      - 'GirlsLight' #(the name of your light as shown in the app)
-    roomnames: #(optional)
-      - 'BoysRoom' #(the name of your room as shown in the app)
-```
-
-friendlynames is mostly optional now, the integration should automatically find most lights. If it does not work, specify the friendlynames. The roomnames is optional, and friendlynames is not needed if used. It will add all devices in the room you made in the hubspace app. No support for this will be given, as added by a PR and not tested by me, but should work.
-
-Friendlyname is listed in the Hubspace App. Click the Device, Click the Gear, Under General will list "Product Name" which is the friendlyname. The Room is the roomname if you prefer to add it that way.
-
-If detected, your light will show up as a HomeAssistant Entity (not a Device) named `light.<friendlyname>` i.e. `light.boyslight`. You'll need to edit and assign it to the HomeAssistant Area that you prefer. Finally you'll probably want to edit your dashboard and add the entity to it.
 
 ### Troubleshooting
 
