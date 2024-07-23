@@ -64,6 +64,7 @@ device classes are supported:
  * fan
  * light
  * power-outlet
+ * 
 
 If your device class is not listed here, please refer to the section
 ``Support for a new model`` on how to get it added.

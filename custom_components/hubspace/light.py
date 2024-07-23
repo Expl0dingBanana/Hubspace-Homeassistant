@@ -239,14 +239,14 @@ class HubspaceLight(CoordinatorEntity, LightEntity):
         else:
             return self._state == "on"
 
-    # @property
-    # def device_info(self) -> DeviceInfo:
-    #     """Return the device info."""
-    #     return DeviceInfo(
-    #         identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
-    #         name=self.name,
-    #         model=self._bonus_attrs["model"],
-    #     )
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
+            name=self.name,
+            model=self._bonus_attrs["model"],
+        )
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:

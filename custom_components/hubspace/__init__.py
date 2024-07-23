@@ -13,7 +13,7 @@ from .coordinator import HubSpaceDataUpdateCoordinator
 
 logger = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.FAN, Platform.LIGHT, Platform.SWITCH]
+PLATFORMS = [Platform.FAN, Platform.LIGHT, Platform.SWITCH, Platform.BUTTON]
 
 
 @dataclass

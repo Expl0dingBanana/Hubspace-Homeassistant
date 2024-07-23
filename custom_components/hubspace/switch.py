@@ -96,14 +96,14 @@ class HubSpaceSwitch(SwitchEntity):
         else:
             return self._state == "on"
 
-    # @property
-    # def device_info(self) -> DeviceInfo:
-    #     """Return the device info."""
-    #     return DeviceInfo(
-    #         identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
-    #         name=self._name,
-    #         model=self._bonus_attrs["model"],
-    #     )
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
+            name=self._name,
+            model=self._bonus_attrs["model"],
+        )
 
     async def async_turn_on(self, **kwargs) -> None:
         logger.debug("Enabling %s on %s", self._instance, self._child_id)

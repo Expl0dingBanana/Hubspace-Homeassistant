@@ -191,14 +191,14 @@ class HubspaceFan(CoordinatorEntity, FanEntity):
         else:
             return self._state == "on"
 
-    # @property
-    # def device_info(self) -> DeviceInfo:
-    #     """Return the device info."""
-    #     return DeviceInfo(
-    #         identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
-    #         name=self._name,
-    #         model=self._bonus_attrs["model"],
-    #     )
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
+            name=self._name,
+            model=self._bonus_attrs["model"],
+        )
 
     @property
     def current_direction(self):
