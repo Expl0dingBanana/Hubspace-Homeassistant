@@ -2,13 +2,15 @@
 
 import dataclasses
 import logging
-from contextlib import suppress
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util.percentage import percentage_to_ranged_value
+
+from .const import DOMAIN
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,6 @@ from homeassistant.components.light import (
     ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
-    LightEntityFeature,
 )
 from hubspace_async import HubSpaceState
 
@@ -238,6 +239,15 @@ class HubspaceLight(CoordinatorEntity, LightEntity):
         else:
             return self._state == "on"
 
+    # @property
+    # def device_info(self) -> DeviceInfo:
+    #     """Return the device info."""
+    #     return DeviceInfo(
+    #         identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
+    #         name=self.name,
+    #         model=self._bonus_attrs["model"],
+    #     )
+
     @property
     def supported_color_modes(self) -> set[ColorMode]:
         """Flag supported color modes."""
@@ -368,7 +378,15 @@ async def async_setup_entry(
         entry.runtime_data.coordinator_hubspace
     )
     entities: list[HubspaceLight] = []
+    device_registry = dr.async_get(hass)
     for entity in coordinator_hubspace.data["devices"]:
+        # Force everything to have a device
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entity.device_id)},
+            name=entity.friendly_name,
+            model=entity.model,
+        )
         if entity.device_class != "light":
             logger.debug(
                 f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"

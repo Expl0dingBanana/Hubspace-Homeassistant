@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.valve import ValveEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -14,7 +14,7 @@ from .coordinator import HubSpaceDataUpdateCoordinator
 logger = logging.getLogger(__name__)
 
 
-class HubSpaceSwitch(SwitchEntity):
+class HubSpaceValve(ValveEntity):
     """HubSpace switch-type that can communicate with Home Assistant
 
     :ivar _name: Name of the device
@@ -24,6 +24,8 @@ class HubSpaceSwitch(SwitchEntity):
     :ivar _bonus_attrs: Attributes relayed to Home Assistant that do not need to be
         tracked in their own class variables
     :ivar _instance: functionInstance within the HS device
+    :ivar _current_valve_position: Current position of the valve
+    :ivar _reports_position: Reports position of the valve
     """
 
     def __init__(
@@ -46,7 +48,9 @@ class HubSpaceSwitch(SwitchEntity):
             "Child ID": self._child_id,
         }
         # Entity-specific
-        self._instance = instance
+        self._instance: str = instance
+        self._current_valve_position: int | None = None
+        self._reports_position: bool = False
         super().__init__(hs, context=self._child_id)
 
     @callback
@@ -105,8 +109,8 @@ class HubSpaceSwitch(SwitchEntity):
     #         model=self._bonus_attrs["model"],
     #     )
 
-    async def async_turn_on(self, **kwargs) -> None:
-        logger.debug("Enabling %s on %s", self._instance, self._child_id)
+    async def async_open_valve(self, **kwargs) -> None:
+        logger.debug("Opening %s on %s", self._instance, self._child_id)
         self._state = "on"
         states_to_set = [
             HubSpaceState(
@@ -118,8 +122,8 @@ class HubSpaceSwitch(SwitchEntity):
         await self._hs.set_device_states(self._child_id, states_to_set)
         self.async_write_ha_state()
 
-    async def async_turn_off(self, **kwargs) -> None:
-        logger.debug("Disabling %s on %s", self._instance, self._child_id)
+    async def async_close_valve(self, **kwargs) -> None:
+        logger.debug("Closing %s on %s", self._instance, self._child_id)
         self._state = "off"
         states_to_set = [
             HubSpaceState(
@@ -141,15 +145,14 @@ async def async_setup_entry(
     coordinator_hubspace: HubSpaceDataUpdateCoordinator = (
         entry.runtime_data.coordinator_hubspace
     )
-    entities: list[HubSpaceSwitch] = []
+    entities: list[HubSpaceValve] = []
     for entity in coordinator_hubspace.data["devices"]:
-        # @TODO - How to identify a transformer?
-        if entity.device_class in ["power-outlet", "water-timer"]:
+        if entity.device_class == "water-timer":
             for function in entity.functions:
                 if function["functionClass"] != "toggle":
                     continue
                 instance = function["functionInstance"]
-                ha_entity = HubSpaceSwitch(
+                ha_entity = HubSpaceValve(
                     coordinator_hubspace,
                     entity.friendly_name,
                     instance,

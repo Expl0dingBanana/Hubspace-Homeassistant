@@ -5,6 +5,7 @@ from contextlib import suppress
 from typing import Any, Optional, Union
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util.percentage import (
@@ -163,22 +164,41 @@ class HubspaceFan(CoordinatorEntity, FanEntity):
                 self._bonus_attrs[state.functionClass] = state.value
 
     @property
+    def should_poll(self):
+        return False
+
+    # Entity-specific properties
+    @property
     def name(self) -> str:
-        """Return the display name of this fan."""
+        """Return the display name of this light."""
         return self._name
 
     @property
     def unique_id(self) -> str:
-        return self._child_id + "_fan"
-
-    @property
-    def is_on(self) -> bool:
-        return self._state == "on"
+        """Return the display name of this light."""
+        return self._child_id
 
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
         return self._bonus_attrs
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if light is on."""
+        if self._state is None:
+            return None
+        else:
+            return self._state == "on"
+
+    # @property
+    # def device_info(self) -> DeviceInfo:
+    #     """Return the device info."""
+    #     return DeviceInfo(
+    #         identifiers={(DOMAIN, self._bonus_attrs["deviceId"])},
+    #         name=self._name,
+    #         model=self._bonus_attrs["model"],
+    #     )
 
     @property
     def current_direction(self):
@@ -216,10 +236,6 @@ class HubspaceFan(CoordinatorEntity, FanEntity):
     @property
     def supported_features(self):
         return self._supported_features
-
-    @property
-    def should_poll(self):
-        return False
 
     async def async_turn_on(
         self,
