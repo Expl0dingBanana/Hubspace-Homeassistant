@@ -289,7 +289,6 @@ class HubspaceLight(CoordinatorEntity, LightEntity):
             self._color_modes.remove(ColorMode.ONOFF)
         if len(self._color_modes) > 1 and ColorMode.ONOFF in self._color_modes:
             self._color_modes.remove(ColorMode.ONOFF)
-        logger.warning(self._color_modes)
 
     async def async_turn_on(self, **kwargs) -> None:
         logger.debug(f"Adjusting light {self._child_id} with {kwargs}")
