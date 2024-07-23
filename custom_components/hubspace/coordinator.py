@@ -47,6 +47,8 @@ class HubSpaceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.tracked_devs = await discovery.get_requested_devices(
             self.conn, self.friendly_names, self.room_names
         )
+        # @TODO - Is it possible to get all states in a single call, rather than
+        #   a call per device?
         for device in self.tracked_devs:
             child_id = device.id
             self.states[child_id] = await self.conn.get_device_state(child_id)

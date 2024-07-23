@@ -1,50 +1,30 @@
-"""Platform for light integration."""
+"""Platform for fan integration."""
 
-from __future__ import annotations
-
+import dataclasses
 import logging
-from datetime import timedelta
+from contextlib import suppress
+from typing import Any, Optional, Union
 
-# Import exceptions from the requests module
-import requests.exceptions
-import voluptuous as vol
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util.percentage import percentage_to_ranged_value
+
+logger = logging.getLogger(__name__)
+
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP,
     ATTR_COLOR_TEMP_KELVIN,
-    PLATFORM_SCHEMA,
+    ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
+    LightEntityFeature,
 )
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant, ServiceCall
+from hubspace_async import HubSpaceState
 
-# Import the device class from the component that you want to support
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_platform
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import Any, ConfigType, DiscoveryInfoType
-
-from . import hubspace_device
-from .const import CONF_DEBUG, CONF_FRIENDLYNAMES, CONF_ROOMNAMES
-from .hubspace import HubSpace
-
-SCAN_INTERVAL = timedelta(seconds=30)
-SERVICE_NAME = "send_command"
-_LOGGER = logging.getLogger(__name__)
-
-# Validation of the user's configuration
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_USERNAME): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
-        vol.Required(CONF_DEBUG, default=False): cv.boolean,
-        vol.Required(CONF_FRIENDLYNAMES, default=[]): vol.All(
-            cv.ensure_list, [cv.string]
-        ),
-        vol.Required(CONF_ROOMNAMES, default=[]): vol.All(cv.ensure_list, [cv.string]),
-    }
-)
+from . import HubSpaceConfigEntry
+from .coordinator import HubSpaceDataUpdateCoordinator
 
 
 def _brightness_to_hass(value):
@@ -57,183 +37,184 @@ def _brightness_to_hubspace(value):
     return value * 100 // 255
 
 
-def _convert_color_temp(value):
-    if isinstance(value, str) and value.endswith("K"):
-        value = value[:-1]
-    if value is None:
-        value = 1
-    return 1000000 // int(value)
+def process_range(range_vals: dict) -> list[Any]:
+    """Process a range to determine what's supported
 
-
-def create_ha_entity(hs: HubSpace, debug: bool, entity: hubspace_device.HubSpaceDevice):
-    """Query HubSpace and find devices to add
-
-    :param hs: HubSpace connection
-    :param debug: If debug is enabled
-    :param entity: HubSpace API device
-
+    :param range_vals: Result from functions["values"][x]
     """
-    if entity.device_class in ["light", "switch"]:
-        return HubspaceLight(
-            hs,
-            entity.friendly_name,
-            debug,
-            childId=entity.id,
-            model=entity.model,
-            deviceId=entity.device_id,
-            functions=entity.functions,
-        )
+    supported_range = []
+    range_min = range_vals["range"]["min"]
+    range_max = range_vals["range"]["max"]
+    range_step = range_vals["range"]["step"]
+    if range_min == range_max:
+        supported_range.append(range_max)
     else:
-        _LOGGER.debug(
-            f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"
-        )
+        for brightness in range(range_min, range_max, range_step):
+            supported_range.append(brightness)
+        if range_max not in supported_range:
+            supported_range.append(range_max)
+    return supported_range
 
 
-def setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
-) -> None:
-    """Set up the Awesome Light platform."""
-
-    # Assign configuration variables.
-    # The configuration check takes care they are present.
-
-    username = config[CONF_USERNAME]
-    password = config.get(CONF_PASSWORD)
-    debug = config.get(CONF_DEBUG)
-    try:
-        hs = HubSpace(username, password)
-    except requests.exceptions.ReadTimeout as ex:
-        # Where does this exception come from? The integration will break either way
-        # but more spectacularly since the exception is not imported
-        raise PlatformNotReady(
-            f"Connection error while connecting to hubspace: {ex}"
-        ) from ex
-
-    entities = []
-    friendly_names: list[str] = config.get(CONF_FRIENDLYNAMES, [])
-    room_names: list[str] = config.get(CONF_ROOMNAMES, [])
-    data = hs.getMetadeviceInfo().json()
-    for entity in hubspace_device.get_hubspace_devices(
-        data, friendly_names, room_names
-    ):
-        ha_entity = create_ha_entity(hs, debug, entity)
-        if ha_entity:
-            _LOGGER.debug(f"Adding an entity {ha_entity._childId}")
-            entities.append(ha_entity)
-    add_entities(entities)
-
-    def my_service(call: ServiceCall) -> None:
-        """My first service."""
-        _LOGGER.info("Received data" + str(call.data))
-        name = SERVICE_NAME
-        entity_ids = call.data["entity_id"]
-        functionClass = call.data["functionClass"]
-        value = call.data["value"]
-
-        if "functionInstance" in call.data:
-            functionInstance = call.data["functionInstance"]
-        else:
-            functionInstance = None
-
-        for entity_id in entity_ids:
-            _LOGGER.info("entity_id: " + str(entity_id))
-            for i in entities:
-                if i.entity_id == entity_id:
-                    _LOGGER.info("Found Entity")
-                    i.send_command(functionClass, value, functionInstance)
-
-    # Register our service with Home Assistant.
-    hass.services.register("hubspace", "send_command", my_service)
+@dataclasses.dataclass
+class RGB:
+    red: int = 0
+    green: int = 0
+    blue: int = 0
 
 
-def process_color_temps(color_temps: dict) -> list[int]:
+def process_color_temps(color_temps: dict) -> tuple[list[int], str]:
     """Determine the supported color temps
 
     :param color_temps: Result from functions["values"]
     """
     supported_temps = []
+    prefix = ""
     for temp in color_temps:
         color_temp = temp["name"]
-        if color_temp.endswith("K"):
-            color_temp = int(color_temp[:-1])
-        supported_temps.append(color_temp)
-    return sorted(supported_temps)
+        if isinstance(color_temp, str) and color_temp.endswith("K"):
+            prefix = "k"
+            color_temp = color_temp[0:-1]
+        supported_temps.append(int(color_temp))
+    return sorted(supported_temps), prefix
 
 
-class HubspaceLight(LightEntity):
-    """Representation of a HubSpace Light"""
+class HubspaceLight(CoordinatorEntity, LightEntity):
+    """HubSpace fan that can communicate with Home Assistant
+
+    @TODO - Support for HS, RGB, RGBW, RGBWW, XY
+
+    :ivar _name: Name of the device
+    :ivar _hs: HubSpace connector
+    :ivar _child_id: ID used when making requests to HubSpace
+    :ivar _state: If the device is on / off
+    :ivar _bonus_attrs: Attributes relayed to Home Assistant that do not need to be
+        tracked in their own class variables
+    :ivar _instance_attrs: Additional attributes that are required when
+        POSTing to HubSpace
+    :ivar _color_modes: Supported options for the light
+    :ivar _color_mode: Current color mode of the light
+    :ivar _color_temp: Current temperature of the light
+    :ivar _temperature_choices: Supported temperatures of the light
+    :ivar _temperature_prefix: Prefix for HubSpace
+    :ivar _brightness: Current brightness of the light
+    :ivar _supported_brightness: Supported brightness of the light
+    :ivar _rgb: Current RGB values
+
+
+    :param hs: HubSpace connector
+    :param friendly_name: The friendly name of the device
+    :param child_id: ID used when making requests to HubSpace
+    :param model: Model of the device
+    :param device_id: Parent Device ID
+    :param functions: List of supported functions for the device
+    """
+
+    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(
         self,
-        hs,
-        friendlyname,
-        debug,
-        childId=None,
-        model=None,
-        deviceId=None,
-        functions=None,
+        hs: HubSpaceDataUpdateCoordinator,
+        friendly_name: str,
+        child_id: Optional[str] = None,
+        model: Optional[str] = None,
+        device_id: Optional[str] = None,
+        functions: Optional[list[dict]] = None,
     ) -> None:
-        self._name = friendlyname
+        self._name: str = friendly_name
+        self.coordinator = hs
+        self._hs = hs.conn
+        self._child_id: str = child_id
+        self._state: Optional[str] = None
+        self._bonus_attrs = {
+            "model": model,
+            "deviceId": device_id,
+            "Child ID": self._child_id,
+        }
+        self._instance_attrs: dict[str, str] = {}
+        # Entity-specific
+        self._color_modes: set[ColorMode] = set()
+        self._color_mode: ColorMode = ColorMode.UNKNOWN
+        self._color_temp: Optional[int] = None
+        self._temperature_choices: Optional[set[Any]] = set()
+        self._temperature_prefix: str = ""
+        self._supported_brightness: Optional[list[int]] = []
+        self._brightness: Optional[int] = None
+        self._rgb: RGB = RGB(red=0, green=0, blue=0)
 
-        self._debug = debug
-        self._state = "off"
-        self._childId = childId
-        self._model = model
-        self._brightness = None
-        self._usePowerFunctionInstance = None
-        self._hs = hs
-        self._deviceId = deviceId
-        self._debugInfo = None
+        self.process_functions(functions)
+        self._adjust_supported_modes()
+        super().__init__(hs, context=self._child_id)
 
-        # colorMode == 'color' || 'white'
-        self._colorMode = None
-        self._colorTemp = None
-        self._rgbColor = None
-        self._temperature_choices = None
-        self._temperature_suffix = None
-        self._supported_color_modes = set(ColorMode.ONOFF)
-        self._supported_brightness = []
-
-        if functions:
-            self.process_functions(functions)
-
-    async def async_setup_entry(hass, entry):
-        """Set up the media player platform for Sonos."""
-
-        platform = entity_platform.async_get_current_platform()
-
-        platform.async_register_entity_service(
-            "send_command",
-            {
-                vol.Required("functionClass"): cv.string,
-                vol.Required("value"): cv.string,
-                vol.Optional("functionInstance"): cv.string,
-            },
-            "send_command",
-        )
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.update_states()
+        self.async_write_ha_state()
 
     def process_functions(self, functions: list[dict]) -> None:
-        """Process the functions and configure the light attributes
+        """Process available functions
+
 
         :param functions: Functions that are supported from the API
         """
         for function in functions:
+            if function.get("functionInstance"):
+                self._instance_attrs[function["functionClass"]] = function[
+                    "functionInstance"
+                ]
             if function["functionClass"] == "power":
-                self._usePowerFunctionInstance = function.get("functionInstance", None)
+                self._color_modes.add(ColorMode.ONOFF)
             elif function["functionClass"] == "color-temperature":
-                self._temperature_choices = process_color_temps(function["values"])
+                self._temperature_choices, self._temperature_prefix = (
+                    process_color_temps(function["values"])
+                )
                 if self._temperature_choices:
-                    self._supported_color_modes.add(ColorMode.COLOR_TEMP)
-                    self._temperature_suffix = "K"
+                    self._color_modes.add(ColorMode.COLOR_TEMP)
             elif function["functionClass"] == "brightness":
-                temp_bright = hubspace_device.process_range(function["values"][0])
+                temp_bright = process_range(function["values"][0])
                 if temp_bright:
                     self._supported_brightness = temp_bright
-                    self._supported_color_modes.add(ColorMode.BRIGHTNESS)
+                    self._color_modes.add(ColorMode.BRIGHTNESS)
+            elif function["functionClass"] == "color-rgb":
+                self._color_modes.add(ColorMode.RGB)
 
+    def update_states(self) -> None:
+        """Load initial states into the device"""
+        states: list[HubSpaceState] = self.coordinator.data["states"].get(
+            self._child_id, []
+        )
+        if not states:
+            logger.debug(
+                "No states found for %s. Maybe hasn't polled yet?", self._child_id
+            )
+        additional_attrs = []
+        # functionClass -> internal attribute
+        for state in states:
+            if state.functionClass == "power":
+                self._state = state.value
+            elif state.functionClass == "color-temperature":
+                if isinstance(state.value, str) and state.value.endswith("K"):
+                    state.value = state.value[0:-1]
+                self._color_temp = int(state.value)
+            elif state.functionClass == "brightness":
+                self._brightness = _brightness_to_hass(state.value)
+            elif state.functionClass == "color-mode":
+                self._color_mode = state.value
+            elif state.functionClass == "color-rgb":
+                self._rgb = RGB(
+                    red=state.value["color-rgb"].get("r", 0),
+                    green=state.value["color-rgb"].get("g", 0),
+                    blue=state.value["color-rgb"].get("b", 0),
+                )
+            elif state.functionClass in additional_attrs:
+                self._bonus_attrs[state.functionClass] = state.value
+
+    @property
+    def should_poll(self):
+        return False
+
+    # Entity-specific properties
     @property
     def name(self) -> str:
         """Return the display name of this light."""
@@ -242,18 +223,22 @@ class HubspaceLight(LightEntity):
     @property
     def unique_id(self) -> str:
         """Return the display name of this light."""
-        return self._childId
-
-    @property
-    def color_mode(self) -> ColorMode:
-        if self._colorMode == "color":
-            return ColorMode.RGB
-        return self._colorMode
+        return self._child_id
 
     @property
     def supported_color_modes(self) -> set[ColorMode]:
         """Flag supported color modes."""
-        return {*self._supported_color_modes}
+        if not self._color_modes:
+            return {ColorMode.UNKNOWN}
+        else:
+            return {*self._color_modes}
+
+    @property
+    def color_mode(self) -> ColorMode | str | None:
+        if len(self._color_modes) == 1 and not self._color_mode:
+            return list(self._color_modes)[0]
+        else:
+            return self._color_mode
 
     @property
     def brightness(self) -> int or None:
@@ -276,99 +261,123 @@ class HubspaceLight(LightEntity):
     def max_color_temp_kelvin(self) -> int:
         return max(self._temperature_choices)
 
-    def send_command(self, field_name, field_state, functionInstance=None) -> None:
-        self._hs.setState(self._childId, field_name, field_state, functionInstance)
+    @property
+    def color_temp_kelvin(self) -> int:
+        return self._color_temp
 
-    def set_send_state(self, field_name, field_state) -> None:
-        self._hs.setState(self._childId, field_name, field_state)
+    @property
+    def rgb_color(self) -> tuple[int, int, int]:
+        return (
+            self._rgb.red,
+            self._rgb.green,
+            self._rgb.blue,
+        )
 
-    def turn_on(self, **kwargs: Any) -> None:
-        """Perform power on and set additional attributes"""
-        _LOGGER.debug(f"Adjusting light {self._childId} with {kwargs}")
-        power_state = {
-            "functionClass": "power",
-            "value": "on",
-        }
+    # Entity-specific functions
+    def _adjust_supported_modes(self):
+        """Lights are annoying"""
+        mode_temp = {ColorMode.BRIGHTNESS, ColorMode.COLOR_TEMP}
+        mode_bright = {ColorMode.BRIGHTNESS, ColorMode.ONOFF}
+        if mode_temp & self._color_modes == mode_temp:
+            self._color_modes.remove(ColorMode.BRIGHTNESS)
+        if mode_bright & self._color_modes == mode_bright:
+            self._color_modes.remove(ColorMode.ONOFF)
+        if len(self._color_modes) > 1 and ColorMode.ONOFF in self._color_modes:
+            self._color_modes.remove(ColorMode.ONOFF)
+        logger.warning(self._color_modes)
+
+    async def async_turn_on(self, **kwargs) -> None:
+        logger.debug(f"Adjusting light {self._child_id} with {kwargs}")
         self._state = "on"
-        if self._usePowerFunctionInstance:
-            power_state["functionInstance"] = self._usePowerFunctionInstance
-        states_to_set = [power_state]
-        if (
-            ATTR_BRIGHTNESS in kwargs
-            and ColorMode.BRIGHTNESS in self._supported_color_modes
-        ):
+        states_to_set = [
+            HubSpaceState(
+                functionClass="power",
+                functionInstance=self._instance_attrs.get("power", None),
+                value="on",
+            )
+        ]
+        if ATTR_BRIGHTNESS in kwargs:
             brightness = kwargs.get(ATTR_BRIGHTNESS, self._brightness)
             states_to_set.append(
-                {
-                    "functionClass": "brightness",
-                    "value": _brightness_to_hubspace(brightness),
-                }
+                HubSpaceState(
+                    functionClass="brightness",
+                    functionInstance=self._instance_attrs.get("brightness", None),
+                    value=_brightness_to_hubspace(brightness),
+                )
             )
             self._brightness = brightness
-        if (
-            ATTR_COLOR_TEMP in kwargs
-            and ColorMode.COLOR_TEMP in self._supported_color_modes
-        ):
-            color_to_set = self._temperature_choices[0]
+        if ATTR_COLOR_TEMP in kwargs:
+            color_to_set = list(self._temperature_choices)[0]
             # I am not sure how to set specific values, so find the value
             # that is closest without going over
-            for color in self._temperature_choices:
-                if kwargs[ATTR_COLOR_TEMP_KELVIN] <= color:
-                    color_to_set = color
+            for temperature in self._temperature_choices:
+                if kwargs[ATTR_COLOR_TEMP_KELVIN] <= temperature:
+                    color_to_set = temperature
                     break
-            states_to_set.append(
-                {
-                    "functionClass": "color-temperature",
-                    "value": f"{color_to_set}K",
-                }
-            )
-            self._colorTemp = color_to_set
-        self._hs.set_states(self._childId, states_to_set)
-
-    @property
-    def rgb_color(self):
-        """Return the rgb value."""
-        return self._rgbColor
-
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
-        return {
-            "model": self._model,
-            "deviceId": self._deviceId,
-            "Supported Temperatures": [f"{x}K" for x in self._temperature_choices],
-            "Child ID": self._childId,
-        }
-
-    def turn_off(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        self._hs.setPowerState(self._childId, "off", self._usePowerFunctionInstance)
-
-    @property
-    def should_poll(self):
-        """Turn on polling"""
-        return True
-
-    def update(self) -> None:
-        """Fetch new state data for this light.
-
-        This is the only method that should fetch new data for Home Assistant.
-        """
-        for state in self._hs.get_states(self._childId)["values"]:
-            if state["functionClass"] == "power":
-                self._state = state["value"]
-            elif state["functionClass"] == "color-temperature":
-                tmp_state = state["value"]
-                if tmp_state.endswith("K"):
-                    tmp_state = tmp_state[:-1]
-                self._colorTemp = tmp_state
-            elif state["functionClass"] == "brightness":
-                self._brightness = _brightness_to_hass(state["value"])
-            elif state["functionClass"] == "color-mode":
-                self._colorMode = state["value"]
-            elif state["functionClass"] == "color-rgb":
-                self._colorMode = (
-                    int(state.get("color-rgb").get("r")),
-                    int(state.get("color-rgb").get("g")),
-                    int(state.get("color-rgb").get("b")),
+                states_to_set.append(
+                    HubSpaceState(
+                        functionClass="color-temperature",
+                        functionInstance=self._instance_attrs.get(
+                            "color-temperature", None
+                        ),
+                        value=f"{temperature}{self._temperature_prefix}",
+                    )
                 )
+            self._color_temp = color_to_set
+        if ATTR_RGB_COLOR in kwargs:
+            self._rgb = RGB(
+                red=kwargs[ATTR_RGB_COLOR][0],
+                green=kwargs[ATTR_RGB_COLOR][1],
+                blue=kwargs[ATTR_RGB_COLOR][2],
+            )
+            states_to_set.append(
+                HubSpaceState(
+                    functionClass="color-rgb",
+                    functionInstance=self._instance_attrs.get("color-rgb", None),
+                    value=kwargs[ATTR_RGB_COLOR],
+                )
+            )
+        await self._hs.set_device_states(self._child_id, states_to_set)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        logger.debug(f"Adjusting light {self._child_id} with {kwargs}")
+        self._state = "off"
+        states_to_set = [
+            HubSpaceState(
+                functionClass="power",
+                functionInstance=self._instance_attrs.get("power", None),
+                value=self._state,
+            )
+        ]
+        await self._hs.set_device_states(self._child_id, states_to_set)
+        self.async_write_ha_state()
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: HubSpaceConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Add Fan entities from a config_entry."""
+    coordinator_hubspace: HubSpaceDataUpdateCoordinator = (
+        entry.runtime_data.coordinator_hubspace
+    )
+    entities: list[HubspaceLight] = []
+    for entity in coordinator_hubspace.data["devices"]:
+        if entity.device_class != "light":
+            logger.debug(
+                f"Unable to process the entity {entity.friendly_name} of class {entity.device_class}"
+            )
+            continue
+        ha_entity = HubspaceLight(
+            coordinator_hubspace,
+            entity.friendly_name,
+            child_id=entity.id,
+            model=entity.model,
+            device_id=entity.device_id,
+            functions=entity.functions,
+        )
+        logger.debug(f"Adding a light, {ha_entity._child_id}")
+        entities.append(ha_entity)
+    async_add_entities(entities)

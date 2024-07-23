@@ -3,18 +3,16 @@
     "config": {
         "step": {
             "user": {
-                "title": "testing!!",
-                "description": "blah blah",
                 "data": {
                     "username": "Username",
                     "password": "Password",
-                    "rooms": "rooms",
+                    "roomnames": "roomnames",
                     "friendlynames": "friendlynames"
                 },
                 "data_description": {
                     "username": "Username",
                     "password": "Password",
-                    "rooms": "rooms",
+                    "roomnames": "roomnames",
                     "friendlynames": "friendlynames"
                 }
             }
