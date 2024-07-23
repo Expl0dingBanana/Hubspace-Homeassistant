@@ -80,7 +80,7 @@ def process_color_temps(color_temps: dict) -> tuple[list[int], str]:
 
 
 class HubspaceLight(CoordinatorEntity, LightEntity):
-    """HubSpace fan that can communicate with Home Assistant
+    """HubSpace light that can communicate with Home Assistant
 
     @TODO - Support for HS, RGB, RGBW, RGBWW, XY
 
@@ -226,6 +226,19 @@ class HubspaceLight(CoordinatorEntity, LightEntity):
         return self._child_id
 
     @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        return self._bonus_attrs
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if light is on."""
+        if self._state is None:
+            return None
+        else:
+            return self._state == "on"
+
+    @property
     def supported_color_modes(self) -> set[ColorMode]:
         """Flag supported color modes."""
         if not self._color_modes:
@@ -244,14 +257,6 @@ class HubspaceLight(CoordinatorEntity, LightEntity):
     def brightness(self) -> int or None:
         """Return the brightness of this light between 0..255."""
         return self._brightness
-
-    @property
-    def is_on(self) -> bool | None:
-        """Return true if light is on."""
-        if self._state is None:
-            return None
-        else:
-            return self._state == "on"
 
     @property
     def min_color_temp_kelvin(self) -> int:
