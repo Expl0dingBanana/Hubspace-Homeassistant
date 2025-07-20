@@ -1,71 +1,38 @@
-name: Report an issue with Hubspace custom component
-description: Report an issue with HACS plugin Hubspace
-body:
+---
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: ''
+assignees: ''
 
-- type: markdown
-  attributes:
-  value: |
-  This issue form is for reporting bugs only!
-- type: dropdown
-  validations:
-  required: true
-  attributes:
-  label: When did this issue occur?
-  options: - New Issue - After Home Assistant Upgrade - After custom component upgrade
-- type: textarea
-  validations:
-  required: true
-  attributes:
-  label: The problem
-  description: >-
-  Describe the issue here.
+---
 
-      Provide a clear and concise description of what the problem is.
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-- type: textarea
-  validations:
-  required: false
-  attributes:
-  label: Datadump
-  description: >-
-  Place to upload `_dump_hs_devices.json` for debugging purposes.
-- type: markdown
-  attributes:
-  value: | ## Environment
-- type: input
-  id: version
-  validations:
-  required: true
-  attributes:
-  label: What version of Home Assistant Core has the issue?
-  placeholder: core-
-  description: >
-  Can be found in: [Settings ⇒ System ⇒ Repairs ⇒ Three Dots in Upper Right ⇒ System information](https://my.home-assistant.io/redirect/system_health/).
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-      [![Open your Home Assistant instance and show the system information.](https://my.home-assistant.io/badges/system_health.svg)](https://my.home-assistant.io/redirect/system_health/)
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-- type: dropdown
-  validations:
-  required: true
-  attributes:
-  label: What type of installation are you running?
-  description: >
-  Can be found in: [Settings ⇒ System ⇒ Repairs ⇒ Three Dots in Upper Right ⇒ System information](https://my.home-assistant.io/redirect/system_health/).
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
 
-      [![Open your Home Assistant instance and show the system information.](https://my.home-assistant.io/badges/system_health.svg)](https://my.home-assistant.io/redirect/system_health/)
+**Desktop (please complete the following information):**
+ - OS: [e.g. iOS]
+ - Browser [e.g. chrome, safari]
+ - Version [e.g. 22]
 
-  options: - Home Assistant OS - Home Assistant Container - Home Assistant Supervised - Home Assistant Core
+**Smartphone (please complete the following information):**
+ - Device: [e.g. iPhone6]
+ - OS: [e.g. iOS8.1]
+ - Browser [e.g. stock browser, safari]
+ - Version [e.g. 22]
 
-- type: markdown
-  attributes:
-  value: | # Details
-- type: textarea
-  attributes:
-  label: Anything in the logs that might be useful for us?
-  description: For example, error message, or stack traces.
-  render: txt
-- type: textarea
-  attributes:
-  label: Additional information
-  description: >
-  If you have any additional information for us, use the field below.
+**Additional context**
+Add any other context about the problem here.
