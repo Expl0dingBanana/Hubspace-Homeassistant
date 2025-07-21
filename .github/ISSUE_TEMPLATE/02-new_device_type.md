@@ -1,10 +1,13 @@
-name: Add a new device to Hubspace plugin
+name: Add support for a device
 description: A device is missing from the Hubspace plugin
+labels: ["enhancement"]
+assignees:
+  - Expl0dingBanana
 body:
   - type: markdown
     attributes:
       value: |
-        This issue form is for adding new devices only!
+        This issue form is for adding a new device only!
   - type: textarea
     validations:
       required: false
@@ -18,7 +21,7 @@ body:
     attributes:
       label: Features
       description: >-
-        What features do you want enabled? Optionally provide screenshots of the
+        What features(s) do you want enabled? Optionally provide screenshots of the
         corresponding app for the feature.
   - type: textarea
     validations:

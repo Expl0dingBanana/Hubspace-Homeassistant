@@ -1,5 +1,8 @@
 name: Report an issue with Hubspace custom component
 description: Report an issue with HACS plugin Hubspace
+labels: ["bug", "triage"]
+assignees:
+  - Expl0dingBanana
 body:
   - type: markdown
     attributes:
